@@ -1,6 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = {
+export default {
     "_format": "hh-sol-artifact-1",
     "contractName": "TeleportEscrowFactory",
     "sourceName": "contracts/TeleportEscrowFactory.sol",
