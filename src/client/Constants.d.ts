@@ -1,0 +1,4 @@
+export declare const ESCROW_FACTORY_ADDRESS = "0xE3011A37A904aB90C8881a99BD1F6E21401f1522";
+export declare const TRUSTED_OFFER_SRC_TX_ID = "a9XM4xqx3aJbEKBWC5LnQCPlmS9SjTNa0pTqRAzQezI";
+export declare const DEFAULT_PAYMENT_TOKEN = "0x5bf5b11053e734690269C6B9D438F8C9d48F528A";
+//# sourceMappingURL=Constants.d.ts.map
