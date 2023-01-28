@@ -1,12 +1,9 @@
 import toast from 'react-hot-toast';
-import * as fetcher from './client/Offers';
-import { Buyer } from './client/Buyer';
-import { Seller } from './client/Seller';
+import * as Clients from '@koonopek/teleport';
 import { useEffect, useState, useRef } from 'react';
 import { getRandomValue, encodeBytes } from './random';
-import TeleportEscrow from './client/TeleportEscrow';
 import { ethers } from 'ethers';
-import { DEFAULT_PAYMENT_TOKEN } from './client/Constants';
+import * as Constants from './Constansts';
 
 const ESCROW_STAGES = {
     0: "PENDING",
@@ -18,18 +15,21 @@ export function OfferList({ connection }) {
     const [offers, setOffers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState("PENDING");
-    const buyer = new Buyer(
+    const buyer = new Clients.Buyer(
         { signer: connection.evmSignature, type: 'ethereum' },
         connection.warp,
         connection.evmProvider,
-        connection.signer
+        connection.signer,
+        Constants.OFFER_SRC_TX_ID,
+        Constants.ESCROW_FACTORY_ADDRESS
     );
 
-    const seller = new Seller(
+    const seller = new Clients.Seller(
         { signer: connection.evmSignature, type: 'ethereum' },
         connection.warp,
         connection.evmProvider,
-        connection.signer
+        connection.signer,
+        Constants.OFFER_SRC_TX_ID
     );
 
     const initializedOffers = offers.filter(offer => offer.stage);
@@ -45,9 +45,10 @@ export function OfferList({ connection }) {
         if (offer.stage === "PENDING") {
             return offer;
         } else {
-            const escrows = await fetcher.fetchEscrowsByOfferId(
+            const escrows = await Clients.fetchEscrowsByOfferId(
                 connection.evmProvider,
                 offer.id,
+                Constants.ESCROW_FACTORY_ADDRESS
             );
 
             if (escrows.length === 0) {
@@ -56,7 +57,7 @@ export function OfferList({ connection }) {
 
             const escrow = escrows[0];
 
-            const escrowContract = new ethers.Contract(escrow.id, TeleportEscrow.abi, connection.evmProvider);
+            const escrowContract = new ethers.Contract(escrow.id, Clients.TeleportEscrow.abi, connection.evmProvider);
 
             return {
                 ...offer,
@@ -68,9 +69,9 @@ export function OfferList({ connection }) {
     }
 
     async function init() {
-        const contracts = await fetcher.fetchAllOffersId(100)
+        const contracts = await Clients.fetchAllOffersId(Constants.OFFER_SRC_TX_ID, 100)
             .then(
-                response => fetcher.batchEvaluateOffers(connection.warp, response.contracts, 100)
+                response => Clients.batchEvaluateOffers(connection.warp, response.contracts, 100)
             )
             .then(
                 offers => Promise.all(offers.map(withEscrow))
@@ -211,7 +212,7 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
                             <div className="control">
                                 <div className="tags has-addons">
                                     <a class="tag is-link">Token for payment</a>
-                                    <a class="tag" target="_blank" href={`https://polygonscan.com/token/${offer.priceTokenId}`}>{offer.priceTokenId}</a>
+                                    <a class="tag" target="_blank" href={`https://mumbai.polygonscan.com/token/${offer.priceTokenId}`}>{offer.priceTokenId}</a>
                                 </div>
                             </div>
 
@@ -225,7 +226,7 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
                                 <div className="control">
                                     <div className="tags has-addons">
                                         <a class="tag is-link">Escrow</a>
-                                        <a class="tag" target="_blank" href={`https://polygonscan.com/address/${offer.escrowAddress}`}>{offer.escrowAddress}</a>
+                                        <a class="tag" target="_blank" href={`https://mumbai.polygonscan.com/address/${offer.escrowAddress}`}>{offer.escrowAddress}</a>
                                     </div>
                                 </div>
                                 <Tag name={"Escrow stage"} value={offer.escrowStage} />
@@ -309,7 +310,7 @@ function CreateOfferModal({ seller, addOffer, address }) {
         nftContractId: "",
         nftId: "",
         price: "",
-        priceTokenId: DEFAULT_PAYMENT_TOKEN,
+        priceTokenId: Constants.DEFAULT_PAYMENT_TOKEN,
         receiver: address
     });
 
@@ -329,7 +330,7 @@ function CreateOfferModal({ seller, addOffer, address }) {
                     nftContractId: "",
                     nftId: "",
                     price: "",
-                    priceTokenId: DEFAULT_PAYMENT_TOKEN,
+                    priceTokenId: Constants.DEFAULT_PAYMENT_TOKEN,
                     receiver: address
                 })
             })
@@ -372,7 +373,7 @@ function CreateOfferModal({ seller, addOffer, address }) {
                             <label class="label">Payment in token</label>
                             <div class="select">
                                 <select onChange={e => setFormData({ ...formData, priceTokenId: e.target.value.split('-')[1] })}>
-                                    <option >{`USDT-${DEFAULT_PAYMENT_TOKEN}`}</option>
+                                    <option >{`USDT-${formData.priceTokenId}`}</option>
                                     <option >USDT-test</option>
                                 </select>
                             </div>
