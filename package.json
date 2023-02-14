@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@koonopek/teleport": "^0.0.5",
+    "@koonopek/teleport": "file:../teleport",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
@@ -19,6 +19,7 @@
     "warp-contracts": "^1.2.49",
     "warp-contracts-plugin-ethers": "^1.0.7",
     "warp-contracts-plugin-signature": "^1.0.9",
+    "warp-contracts-pubsub": "^1.0.5",
     "web-vitals": "^2.1.4"
   },
   "scripts": {

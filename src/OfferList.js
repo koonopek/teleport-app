@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { getRandomValue, encodeBytes } from './random';
 import { ethers } from 'ethers';
 import * as Constants from './Constansts';
+import { CreateOfferModal } from './CreateOfferModal';
 
 const ESCROW_STAGES = {
     0: "PENDING",
@@ -36,7 +37,6 @@ export function OfferList({ connection }) {
 
     const filteredOffers = {
         "PENDING": initializedOffers.filter(offer => offer.stage === 'PENDING'),
-        "ACCEPTED_BY_BUYER": initializedOffers.filter(offer => offer.stage === 'ACCEPTED_BY_BUYER' && offer.buyer, connection.address),
         "ACCEPTED_BY_SELLER": initializedOffers.filter(offer => offer.stage === 'ACCEPTED_BY_SELLER' && offer.buyer === connection.address),
         "FINALIZED": initializedOffers.filter(offer => offer.stage === 'FINALIZED' && offer.buyer === connection.address)
     }
@@ -69,13 +69,14 @@ export function OfferList({ connection }) {
     }
 
     async function init() {
-        const contracts = await Clients.fetchAllOffersId(Constants.OFFER_SRC_TX_ID, 100)
+        const contracts = await Clients.fetchAllOffersId(Constants.OFFER_SRC_TX_ID, 1000)
             .then(
-                response => Clients.batchEvaluateOffers(connection.warp, response.contracts, 100)
+                response => Clients.batchEvaluateOffers(connection.warp, response.contracts.slice(0, 100), 100)
             )
             .then(
                 offers => Promise.all(offers.map(withEscrow))
             )
+
             .then(setOffers);
         setLoading(false);
 
@@ -115,7 +116,6 @@ export function OfferList({ connection }) {
                 <div className="tabs">
                     <ul>
                         <li className={tab === "PENDING" ? "is-active" : ""}><a onClick={() => setTab("PENDING")}>Pending</a></li>
-                        <li className={tab === "ACCEPTED_BY_BUYER" ? "is-active" : ""}><a onClick={() => setTab("ACCEPTED_BY_BUYER")}>Accepted by buyer</a></li>
                         <li className={tab === "ACCEPTED_BY_SELLER" ? "is-active" : ""}><a onClick={() => setTab("ACCEPTED_BY_SELLER")}>Accepted by seller</a></li>
                         <li className={tab === "FINALIZED" ? "is-active" : ""}><a onClick={() => setTab("FINALIZED")}>Finalized</a></li>
                     </ul>
@@ -140,10 +140,9 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
             return;
         }
 
-        await buyer.acceptOffer(offer.id, password)
+        await buyer.acceptOffer(offer.id, password, { url: Constants.MATCHER_URL })
             .then(async () => {
                 await updateOffer(offer.id);
-                setTab("ACCEPTED_BY_BUYER");
                 toast.success(`Offer accepted!`);
                 scrollToMe();
             })
@@ -206,7 +205,6 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
 
                             <Tag name={"Stage"} value={offer.stage} />
                             <SonarTag name={"NFT contract id"} type={"contract"} value={offer.nftContractId} />
-                            <Tag name={"NFT id"} value={offer.nftId} />
                             <Tag name={"Price"} value={offer.price}></Tag>
 
                             <div className="control">
@@ -238,7 +236,6 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
                 </div>
             </div>
 
-
             {Footer({
                 stage: offer.stage, acceptOffer, finalizeOffer, offer, acceptEscrow, address, finalizeEscrow
             })}
@@ -251,8 +248,6 @@ function Footer(props) {
     switch (props.stage) {
         case 'PENDING':
             return PendingOfferFooter(props);
-        case 'ACCEPTED_BY_BUYER':
-            return AcceptedByBuyerFooter(props);
         case 'ACCEPTED_BY_SELLER':
             return AcceptedBySellerFooter(props);
         case 'FINALIZED':
@@ -282,17 +277,6 @@ function PendingOfferFooter({ acceptOffer }) {
     )
 }
 
-function AcceptedByBuyerFooter({ offer, address, acceptEscrow }) {
-    const onClick = () => toast.error("Not implemented");
-
-    return (
-        <footer class="card-footer">
-            {offer.owner === address ? <button href="#" class="card-footer-item button outline is-info is-light" onClick={acceptEscrow}>Accept Escrow</button> : null}
-            {offer.owner === address ? <button href="#" class="card-footer-item button outline is-danger is-light" onClick={onClick}>Cancel</button> : null}
-        </footer>
-    )
-}
-
 function AcceptedBySellerFooter({ finalizeOffer }) {
     const onClick = () => toast.error("Not implemented");
     return (
@@ -304,105 +288,7 @@ function AcceptedBySellerFooter({ finalizeOffer }) {
 }
 
 
-function CreateOfferModal({ seller, addOffer, address }) {
-    const [active, setActive] = useState(false);
-    const [formData, setFormData] = useState({
-        nftContractId: "",
-        nftId: "",
-        price: "",
-        priceTokenId: Constants.DEFAULT_PAYMENT_TOKEN,
-        receiver: address
-    });
 
-    const submitOffer = async () => {
-        await seller.createOffer(
-            formData.nftContractId,
-            formData.nftId,
-            formData.price.toString(),
-            formData.priceTokenId,
-            formData.receiver
-        )
-            .then(({ offerId }) => {
-                addOffer(offerId);
-                toast.success("Created new offer!")
-                setActive(false);
-                setFormData({
-                    nftContractId: "",
-                    nftId: "",
-                    price: "",
-                    priceTokenId: Constants.DEFAULT_PAYMENT_TOKEN,
-                    receiver: address
-                })
-            })
-            .catch(err => toast.error(err.message))
-    };
-
-
-    return (
-        <div className='mb-4'>
-            <button className="button is-large is-light is-success" onClick={() => setActive(true)}>
-                <span class="icon is-small">
-                    <i class="fa-solid fa-plus"></i>
-                </span>
-                <span>Create offer</span>
-            </button>
-            <div class={`modal ${active ? "is-active" : ""}`}>
-                <div class="modal-background"></div>
-                <div class="modal-card">
-                    <header class="modal-card-head">
-                        <p class="modal-card-title">Create offer</p>
-                        <button class="delete" aria-label="close" onClick={() => setActive(false)}></button>
-                    </header>
-                    <section class="modal-card-body">
-
-                        <div class="field">
-                            <label class="label">NFT contract id</label>
-                            <div class="control">
-                                <input class="input" type="text" onChange={e => setFormData({ ...formData, nftContractId: e.target.value })} value={formData.nftContractId} placeholder="NFT contract id" />
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label class="label">NFT id</label>
-                            <div class="control">
-                                <input class="input" type="text" onChange={e => setFormData({ ...formData, nftId: e.target.value })} value={formData.nftId} placeholder="NFT id" />
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label class="label">Payment in token</label>
-                            <div class="select">
-                                <select onChange={e => setFormData({ ...formData, priceTokenId: e.target.value.split('-')[1] })}>
-                                    <option >{`USDT-${formData.priceTokenId}`}</option>
-                                    <option >USDT-test</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label class="label">Price</label>
-                            <div class="control">
-                                <input class="input" type="number" onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} value={formData.price} placeholder="Price" />
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label class="label">Receiver</label>
-                            <div class="control">
-                                <input class="input" type="text" onChange={e => setFormData({ ...formData, receiver: e.target.value })} value={formData.receiver} />
-                            </div>
-                        </div>
-
-                    </section>
-                    <footer class="modal-card-foot">
-                        <button class="button is-success" onClick={submitOffer}>Create</button>
-                        <button class="button" onClick={() => setActive(false)}>Cancel</button>
-                    </footer>
-                </div>
-            </div>
-        </div>
-    )
-}
 
 function SonarTag({ name, type, value }) {
     return (

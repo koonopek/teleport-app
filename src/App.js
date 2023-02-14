@@ -4,6 +4,9 @@ import warp from './warp';
 import { createGlobalState } from 'react-hooks-global-state';
 import { OfferList } from './OfferList';
 import { evmSignature } from 'warp-contracts-plugin-signature';
+import { initPubSub } from 'warp-contracts-pubsub';
+
+initPubSub();
 
 const initialState = { page: '0', connected: false, connection: null };
 const { useGlobalState } = createGlobalState(initialState);
