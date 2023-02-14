@@ -5,11 +5,26 @@ import { getRandomValue, encodeBytes } from './random';
 import { ethers } from 'ethers';
 import * as Constants from './Constansts';
 import { CreateOfferModal } from './CreateOfferModal';
+import { subscribe } from 'warp-contracts-pubsub';
 
 const ESCROW_STAGES = {
     0: "PENDING",
     1: "CANCELED",
     2: "FINALIZED"
+}
+
+
+export async function subscribeState(
+    contractId,
+    onMessage
+) {
+    await subscribe(`states/${contractId}`,
+        ({ data }) => {
+            const update = JSON.parse(data);
+            onMessage(update);
+        },
+        (e) => console.warn(e.error.errors)
+    )
 }
 
 export function OfferList({ connection }) {
@@ -68,16 +83,28 @@ export function OfferList({ connection }) {
         }
     }
 
+    const subscribeOffer = offer => subscribeState(
+        offer.id, ({ state, sortKey }) => {
+            if (state.stage !== "PENDING") {
+                toast.success(<span>Offer ${offer.id}<br></br>stage: {state.stage}</span>)
+                updateOffer(offer.id, state)
+            }
+        }
+    );
+
     async function init() {
         const contracts = await Clients.fetchAllOffersId(Constants.OFFER_SRC_TX_ID, 1000)
             .then(
-                response => Clients.batchEvaluateOffers(connection.warp, response.contracts.slice(0, 100), 100)
+                response => Clients.batchEvaluateOffers(connection.warp, response.contracts.slice(0, 5), 100)
             )
             .then(
-                offers => Promise.all(offers.map(withEscrow))
+                offers => {
+                    offers.map(subscribeOffer)
+                    return Promise.all(offers.map(withEscrow));
+                }
             )
-
             .then(setOffers);
+
         setLoading(false);
 
         return contracts;
@@ -87,10 +114,20 @@ export function OfferList({ connection }) {
         init()
     }, [setOffers]);
 
-    const updateOffer = async (offerId) => {
-        const { cachedValue: { state } } = await connection.warp.contract(offerId).readState();
+    const updateOffer = async (offerId, state) => {
+        if (!state) {
+            ({ cachedValue: { state } } = await connection.warp.contract(offerId).readState());
+        }
+
         const offer = await withEscrow({ ...state, id: offerId });
-        setOffers(offers.map(o => {
+
+        setOffers(offers => offers.map(o => {
+            if (o.stage === "ACCEPTED_BY_SELLER" && offer.stage === "PENDING") {
+                return o;
+            }
+            if (o.stage === "FINALIZED") {
+                return o;
+            }
             if (o.id === offerId) {
                 return { ...o, ...offer, isMarked: true };
             }
@@ -101,6 +138,7 @@ export function OfferList({ connection }) {
     const addOffer = async (offerId) => {
         const { cachedValue: { state } } = await connection.warp.contract(offerId).readState();
 
+        subscribeOffer({ id: offerId });
         setOffers(prev => [{ ...state, id: offerId, isMarked: true }, ...prev]);
         setTab("PENDING");
     }

@@ -6,13 +6,11 @@ import { OfferList } from './OfferList';
 import { evmSignature } from 'warp-contracts-plugin-signature';
 import { initPubSub } from 'warp-contracts-pubsub';
 
-initPubSub();
-
 const initialState = { page: '0', connected: false, connection: null };
 const { useGlobalState } = createGlobalState(initialState);
 
 export default function App() {
-
+  initPubSub();
   return (
     <>
       <div className="container">
@@ -33,6 +31,8 @@ async function connect() {
   if (!window.ethereum) {
     throw Error("Ethereum provider missing!");
   }
+
+
 
   await window.ethereum.request({ method: 'eth_requestAccounts' });
 
