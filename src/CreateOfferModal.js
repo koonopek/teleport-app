@@ -1,5 +1,5 @@
 import toast from 'react-hot-toast';
-import { useState, } from 'react';
+import { useEffect, useState, } from 'react';
 import * as Constants from './Constansts';
 
 export function CreateOfferModal({ seller, addOffer, address }) {
@@ -11,6 +11,14 @@ export function CreateOfferModal({ seller, addOffer, address }) {
         receiver: address,
         matcherAddress: Constants.MATCHER_ADDRESS
     });
+
+    const [nfts, setNfts] = useState([]);
+
+    useEffect(() => {
+        fetch(`https://contracts.warp.cc/nft-by-owner?ownerAddress=${address}`).then(r => r.json()).then(resp => {
+            setNfts(resp.contracts.map(c => c.contract_tx_id))
+        })
+    }, []);
 
     const submitOffer = async () => {
         console.log({ createOffer: formData })
@@ -56,8 +64,10 @@ export function CreateOfferModal({ seller, addOffer, address }) {
 
                         <div class="field">
                             <label class="label">NFT contract</label>
-                            <div class="control">
-                                <input class="input" type="text" onChange={e => setFormData({ ...formData, nftContractId: e.target.value })} value={formData.nftContractId} placeholder="NFT id" />
+                            <div class="select">
+                                <select value={formData.nftContractId} onChange={e => setFormData({ ...formData, nftContractId: e.target.value })}>
+                                    {nfts.map((nft) => <option value={nft} key={nft}>{nft}</option>)}
+                                </select>
                             </div>
                         </div>
 
