@@ -60,13 +60,13 @@ export function CreateOfferModal({ seller, addOffer, address }) {
                 <span class="icon is-small">
                     <i class="fa-solid fa-plus"></i>
                 </span>
-                <span>Create offer</span>
+                <span>(P)ost asset</span>
             </button>
             <div class={`modal ${active ? "is-active" : ""}`}>
                 <div class="modal-background"></div>
                 <div class="modal-card">
                     <header class="modal-card-head">
-                        <p class="modal-card-title">Create offer</p>
+                        <p class="modal-card-title">(P)ost Asset</p>
                         <button class="delete" aria-label="close" onClick={() => setActive(false)}></button>
                     </header>
                     <section class="modal-card-body">

@@ -6,6 +6,7 @@ import { ethers } from 'ethers';
 import * as Constants from './Constansts';
 import { CreateOfferModal } from './CreateOfferModal';
 import { subscribe } from 'warp-contracts-pubsub';
+import { generateFromString } from 'generate-avatar'
 
 const ESCROW_STAGES = {
     0: "PENDING",
@@ -86,7 +87,8 @@ export function OfferList({ connection }) {
     const subscribeOffer = offer => subscribeState(
         offer.id, ({ state, sortKey }) => {
             if (state.stage !== "PENDING") {
-                toast.success(<span>Offer ${offer.id}<br></br>stage: {state.stage}</span>)
+                const stage = state.stage === "FINALIZED" ? "TRANSFERRED" : "REPLIED";
+                toast.success(<span>Offer {offer.id}<br></br>stage: {stage}</span>)
                 updateOffer(offer.id, state)
             }
         }
@@ -153,9 +155,9 @@ export function OfferList({ connection }) {
             <div className="box">
                 <div className="tabs">
                     <ul>
-                        <li className={tab === "PENDING" ? "is-active" : ""}><a onClick={() => setTab("PENDING")}>Pending</a></li>
-                        <li className={tab === "ACCEPTED_BY_SELLER" ? "is-active" : ""}><a onClick={() => setTab("ACCEPTED_BY_SELLER")}>Accepted by seller</a></li>
-                        <li className={tab === "FINALIZED" ? "is-active" : ""}><a onClick={() => setTab("FINALIZED")}>Finalized</a></li>
+                        <li className={tab === "PENDING" ? "is-active" : ""}><a onClick={() => setTab("PENDING")}>Waiting for (O)ffer</a></li>
+                        <li className={tab === "ACCEPTED_BY_SELLER" ? "is-active" : ""}><a onClick={() => setTab("ACCEPTED_BY_SELLER")}>(R)eplays</a></li>
+                        <li className={tab === "FINALIZED" ? "is-active" : ""}><a onClick={() => setTab("FINALIZED")}>(T)ransferred</a></li>
                     </ul>
                 </div>
                 {loading ? <div class="box has-text-centered">Loading...</div> :
@@ -234,7 +236,7 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
                 <div className="media">
                     <div className="media-left">
                         <figure className="image is-128x128">
-                            <img src={`https://picsum.photos/128/128?random=${offer.nftContractId}`} alt="Placeholder image" />
+                            <img src={`data:image/svg+xml;utf8,${generateFromString(offer.nftContractId)}`} alt="Placeholder image" />
                         </figure>
                     </div>
 
@@ -310,7 +312,7 @@ function FinalizedFooter({ finalizeEscrow, offer }) {
 function PendingOfferFooter({ acceptOffer }) {
     return (
         <footer class="card-footer">
-            <button href="#" class="card-footer-item button outline is-link is-light" onClick={acceptOffer}>Accept Offer</button>
+            <button href="#" class="card-footer-item button outline is-link is-light" onClick={acceptOffer}>Make (O)ffer</button>
         </footer>
     )
 }
