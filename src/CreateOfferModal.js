@@ -16,12 +16,21 @@ export function CreateOfferModal({ seller, addOffer, address }) {
 
     useEffect(() => {
         fetch(`https://contracts.warp.cc/nft-by-owner?ownerAddress=${address}`).then(r => r.json()).then(resp => {
+            if (resp.contracts.length === 0) {
+                toast.error("You don't own any nfts")
+                return;
+            }
             setNfts(resp.contracts.map(c => c.contract_tx_id))
+            setFormData({ ...formData, nftContractId: resp.contracts[0].contract_tx_id })
         })
     }, []);
 
     const submitOffer = async () => {
         console.log({ createOffer: formData })
+        if (formData.nftContractId === '') {
+            toast.error("You have to choose nftContractId")
+            return;
+        }
         await seller.createOffer(
             formData.nftContractId,
             formData.price.toString(),
