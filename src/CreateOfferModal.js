@@ -37,7 +37,7 @@ export function CreateOfferModal({ seller, addOffer, address }) {
             formData.price.toString(),
             formData.priceTokenId,
             formData.receiver,
-            formData.useMatcher ? { delegate: formData.matcherAddress, url: Constants.MATCHER_URL } : undefined
+            { delegate: formData.matcherAddress, url: Constants.MATCHER_URL }
         )
             .then(({ offerId }) => {
                 addOffer(offerId);
