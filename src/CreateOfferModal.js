@@ -9,7 +9,8 @@ export function CreateOfferModal({ seller, addOffer, address }) {
         price: "",
         priceTokenId: Constants.DEFAULT_PAYMENT_TOKEN,
         receiver: address,
-        matcherAddress: Constants.MATCHER_ADDRESS
+        matcherAddress: Constants.MATCHER_ADDRESS,
+        useMatcher: false
     });
 
     const [nfts, setNfts] = useState([]);
@@ -17,7 +18,6 @@ export function CreateOfferModal({ seller, addOffer, address }) {
     useEffect(() => {
         fetch(`https://contracts.warp.cc/nft-by-owner?ownerAddress=${address}`).then(r => r.json()).then(resp => {
             if (resp.contracts.length === 0) {
-                toast.error("You don't own any nfts")
                 return;
             }
             setNfts(resp.contracts.map(c => c.contract_tx_id))
@@ -28,15 +28,16 @@ export function CreateOfferModal({ seller, addOffer, address }) {
     const submitOffer = async () => {
         console.log({ createOffer: formData })
         if (formData.nftContractId === '') {
-            toast.error("You have to choose nftContractId")
+            toast.error("You have to pass nftContractId")
             return;
         }
+
         await seller.createOffer(
             formData.nftContractId,
             formData.price.toString(),
             formData.priceTokenId,
             formData.receiver,
-            { delegate: formData.matcherAddress, url: Constants.MATCHER_URL }
+            formData.useMatcher ? { delegate: formData.matcherAddress, url: Constants.MATCHER_URL } : undefined
         )
             .then(({ offerId }) => {
                 addOffer(offerId);
@@ -98,18 +99,29 @@ export function CreateOfferModal({ seller, addOffer, address }) {
                         </div>
 
                         <div class="field">
-                            <label class="label">Matcher address<br></br> leave empty, if u don't want to use automatic matcher</label>
-                            <div class="control">
-                                <input class="input" type="text" onChange={e => setFormData({ ...formData, matcherAddress: e.target.value })} value={formData.matcherAddress} placeholder="Matcher" />
-                            </div>
-                        </div>
-
-                        <div class="field">
                             <label class="label">Receiver</label>
                             <div class="control">
                                 <input class="input" type="text" onChange={e => setFormData({ ...formData, receiver: e.target.value })} value={formData.receiver} />
                             </div>
                         </div>
+
+
+                        {/* <div class="field">
+                            <label class="label">Matcher</label>
+                            <label class="checkbox">
+                                <input type="checkbox" onChange={e => setFormData({ ...formData, useMatcher: !formData.useMatcher })} />
+                                Use automatic matcher
+                            </label>
+                        </div> */}
+
+                        <div class="field">
+                            <label class="label">Matcher address</label>
+                            <div class="control">
+                                <input class="input" type="text" onChange={e => setFormData({ ...formData, matcherAddress: e.target.value })} value={formData.matcherAddress} placeholder="Matcher" />
+                            </div>
+                        </div>
+
+
 
                     </section>
                     <footer class="modal-card-foot">

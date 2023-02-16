@@ -122,8 +122,10 @@ function Nav() {
     <nav className="navbar has-text-centered" role="navigation" aria-label="main navigation">
       {/* < div className="navbar-brand has-text-centered" > */}
       <a className="navbar-item is-size-1 is-uppercase is-family-monospace">
-        Teleport
+        (T)(E)(L)(E)(P)(O)(R)(T)
       </a>
+
+
 
       {/* </div > */}
 

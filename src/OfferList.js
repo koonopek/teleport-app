@@ -6,7 +6,8 @@ import { ethers } from 'ethers';
 import * as Constants from './Constansts';
 import { CreateOfferModal } from './CreateOfferModal';
 import { subscribe } from 'warp-contracts-pubsub';
-import { generateFromString } from 'generate-avatar'
+import { generateFromString } from 'generate-avatar';
+import { Mutex } from 'async-mutex';
 
 const ESCROW_STAGES = {
     0: "PENDING",
@@ -14,6 +15,9 @@ const ESCROW_STAGES = {
     2: "FINALIZED"
 }
 
+const mutex = new Mutex();
+const stateUpdates = new Set();
+const trackedEscrows = new Set();
 
 export async function subscribeState(
     contractId,
@@ -74,30 +78,45 @@ export function OfferList({ connection }) {
             const escrow = escrows[0];
 
             const escrowContract = new ethers.Contract(escrow.id, Clients.TeleportEscrow.abi, connection.evmProvider);
+            const escrowStage = ESCROW_STAGES[await escrowContract.stage()]
+
+            if (!trackedEscrows.has(escrow.id) && escrowStage !== "FINALIZED") {
+                trackedEscrows.add(escrow.id);
+                console.log("TRACKING ESCROW " + escrow.id)
+                escrowContract.on("Finalized", async () => {
+                    toast.success(<span>Escrow update {escrow.id}<br />stage: transferred</span>)
+                    updateOffer(offer.id, undefined, {
+                        escrowAddress: escrow.id,
+                        escrowStage: ESCROW_STAGES[await escrowContract.stage()],
+                        escrowExpireAt: (await escrowContract.expireAt()).toNumber()
+                    });
+                });
+            }
 
             return {
                 ...offer,
                 escrowAddress: escrow.id,
-                escrowStage: ESCROW_STAGES[await escrowContract.stage()],
+                escrowStage,
                 escrowExpireAt: (await escrowContract.expireAt()).toNumber()
             }
         }
     }
 
     const subscribeOffer = offer => subscribeState(
-        offer.id, ({ state, sortKey }) => {
-            if (state.stage !== "PENDING") {
-                const stage = state.stage === "FINALIZED" ? "TRANSFERRED" : "REPLIED";
-                toast.success(<span>Offer {offer.id}<br></br>stage: {stage}</span>)
+        offer.id, ({ state }) => mutex.runExclusive(() => {
+            if (state.stage !== "PENDING" && !stateUpdates.has(offer.id + state.stage)) {
+                stateUpdates.add(offer.id + state.stage);
+                const stage = state.stage === "FINALIZED" ? "Transferred" : "Replied";
+                toast.success(<span>Offer update {offer.id}<br />stage: {stage}</span>)
                 updateOffer(offer.id, state)
             }
-        }
+        })
     );
 
     async function init() {
         const contracts = await Clients.fetchAllOffersId(Constants.OFFER_SRC_TX_ID, 1000)
             .then(
-                response => Clients.batchEvaluateOffers(connection.warp, response.contracts.slice(0, 5), 100)
+                response => Clients.batchEvaluateOffers(connection.warp, response.contracts.slice(0, 10), 100)
             )
             .then(
                 offers => {
@@ -116,20 +135,15 @@ export function OfferList({ connection }) {
         init()
     }, [setOffers]);
 
-    const updateOffer = async (offerId, state) => {
+    const updateOffer = async (offerId, state, escrow) => {
         if (!state) {
             ({ cachedValue: { state } } = await connection.warp.contract(offerId).readState());
         }
 
-        const offer = await withEscrow({ ...state, id: offerId });
+
+        const offer = escrow ? { ...state, ...escrow, id: offerId } : await withEscrow({ ...state, id: offerId });
 
         setOffers(offers => offers.map(o => {
-            if (o.stage === "ACCEPTED_BY_SELLER" && offer.stage === "PENDING") {
-                return o;
-            }
-            if (o.stage === "FINALIZED") {
-                return o;
-            }
             if (o.id === offerId) {
                 return { ...o, ...offer, isMarked: true };
             }
@@ -147,16 +161,19 @@ export function OfferList({ connection }) {
 
     return (
         <div>
-            <h1 className="title has-text-centered">Offer List</h1>
             <h2 className="subtitle has-text-centered">
                 Here you can buy NFTs from arweave, and pay for them using ERC20 tokens on Polygon.
             </h2>
+
+            <figure className="image is-3by1" >
+                <img src="https://lmg-labmanager.s3.amazonaws.com/assets/articleNo/25414/aImg/47085/warp-speed-illustration-m.jpg" alt="Placeholder image" />
+            </figure>
             <CreateOfferModal seller={seller} address={connection.address} addOffer={addOffer}></CreateOfferModal>
             <div className="box">
                 <div className="tabs">
                     <ul>
                         <li className={tab === "PENDING" ? "is-active" : ""}><a onClick={() => setTab("PENDING")}>Waiting for (O)ffer</a></li>
-                        <li className={tab === "ACCEPTED_BY_SELLER" ? "is-active" : ""}><a onClick={() => setTab("ACCEPTED_BY_SELLER")}>(R)eplays</a></li>
+                        <li className={tab === "ACCEPTED_BY_SELLER" ? "is-active" : ""}><a onClick={() => setTab("ACCEPTED_BY_SELLER")}>(R)eplied</a></li>
                         <li className={tab === "FINALIZED" ? "is-active" : ""}><a onClick={() => setTab("FINALIZED")}>(T)ransferred</a></li>
                     </ul>
                 </div>
@@ -227,11 +244,6 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
 
     return (
         <div ref={myRef} className={`card mt-4 ${offer.isMarked ? "has-background-warning-light" : ""}`}>
-            {/* <div className="card-image">
-                        <figure className="image is-4by3">
-                            <img src="https://bulma.io/images/placeholders/1280x960.png" alt="Placeholder image" />
-                        </figure>
-                    </div> */}
             <div className="card-content">
                 <div className="media">
                     <div className="media-left">
@@ -243,7 +255,7 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
                     <div className="media-content">
                         <div className="field is-grouped is-grouped-multiline">
 
-                            <Tag name={"Stage"} value={offer.stage} />
+                            <Tag name={"Stage"} value={mapStageName(offer.stage)} />
                             <SonarTag name={"NFT contract id"} type={"contract"} value={offer.nftContractId} />
                             <Tag name={"Price"} value={offer.price}></Tag>
 
@@ -255,7 +267,6 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
                             </div>
 
                             <SonarTag name={"Contract id"} type={"contract"} value={offer.id} />
-                            <SonarTag name="Creator" value={offer.creator} type="creator" />
                             <SonarTag name="Receiver" value={offer.owner} type="creator" />
 
                             {offer.stage !== "PENDING" ? <>
@@ -282,6 +293,17 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
 
         </div>
     )
+}
+
+function mapStageName(stage) {
+    switch (stage) {
+        case "PENDING":
+            return "Waiting for offer";
+        case "ACCEPTED_BY_SELLER":
+            return "Replied";
+        case "FINALIZED":
+            return "Transferred";
+    }
 }
 
 function Footer(props) {
