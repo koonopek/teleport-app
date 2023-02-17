@@ -81,15 +81,16 @@ export function OfferList({ connection }) {
             const escrowStage = ESCROW_STAGES[await escrowContract.stage()]
 
             // if (!trackedEscrows.has(escrow.id) && escrowStage !== "FINALIZED") {
-            trackedEscrows.add(escrow.id);
-            console.log("TRACKING ESCROW " + escrow.id)
             escrowContract.on("Finalized", async () => {
-                toast.success(<span>Escrow update {escrow.id}<br />stage: transferred</span>)
-                updateOffer(offer.id, undefined, {
-                    escrowAddress: escrow.id,
-                    escrowStage: ESCROW_STAGES[await escrowContract.stage()],
-                    escrowExpireAt: (await escrowContract.expireAt()).toNumber()
-                });
+                if (!trackedEscrows.has("SEEN" + escrow.id)) {
+                    trackedEscrows.add("SEEN" + escrow.id);
+                    toast.success(<span>Escrow update {escrow.id}<br />stage: transferred</span>)
+                    updateOffer(offer.id, undefined, {
+                        escrowAddress: escrow.id,
+                        escrowStage: ESCROW_STAGES[await escrowContract.stage()],
+                        escrowExpireAt: (await escrowContract.expireAt()).toNumber()
+                    });
+                }
             });
             // }
 
@@ -196,9 +197,6 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
         }
 
         await buyer.acceptOffer(offer.id, password, { url: Constants.MATCHER_URL })
-            .then(async () => {
-                toast.success(`Offer accepted!`);
-            })
             .catch(e => toast.error(e.message))
 
     }
