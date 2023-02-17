@@ -57,8 +57,8 @@ export function OfferList({ connection }) {
 
     const filteredOffers = {
         "PENDING": initializedOffers.filter(offer => offer.stage === 'PENDING'),
-        "ACCEPTED_BY_SELLER": initializedOffers.filter(offer => offer.stage === 'ACCEPTED_BY_SELLER' && offer.buyer === connection.address),
-        "FINALIZED": initializedOffers.filter(offer => offer.stage === 'FINALIZED' && offer.buyer === connection.address)
+        "ACCEPTED_BY_SELLER": initializedOffers.filter(offer => offer.stage === 'ACCEPTED_BY_SELLER'),
+        "FINALIZED": initializedOffers.filter(offer => offer.stage === 'FINALIZED')
     }
 
     async function withEscrow(offer) {
@@ -80,18 +80,18 @@ export function OfferList({ connection }) {
             const escrowContract = new ethers.Contract(escrow.id, Clients.TeleportEscrow.abi, connection.evmProvider);
             const escrowStage = ESCROW_STAGES[await escrowContract.stage()]
 
-            if (!trackedEscrows.has(escrow.id) && escrowStage !== "FINALIZED") {
-                trackedEscrows.add(escrow.id);
-                console.log("TRACKING ESCROW " + escrow.id)
-                escrowContract.on("Finalized", async () => {
-                    toast.success(<span>Escrow update {escrow.id}<br />stage: transferred</span>)
-                    updateOffer(offer.id, undefined, {
-                        escrowAddress: escrow.id,
-                        escrowStage: ESCROW_STAGES[await escrowContract.stage()],
-                        escrowExpireAt: (await escrowContract.expireAt()).toNumber()
-                    });
+            // if (!trackedEscrows.has(escrow.id) && escrowStage !== "FINALIZED") {
+            trackedEscrows.add(escrow.id);
+            console.log("TRACKING ESCROW " + escrow.id)
+            escrowContract.on("Finalized", async () => {
+                toast.success(<span>Escrow update {escrow.id}<br />stage: transferred</span>)
+                updateOffer(offer.id, undefined, {
+                    escrowAddress: escrow.id,
+                    escrowStage: ESCROW_STAGES[await escrowContract.stage()],
+                    escrowExpireAt: (await escrowContract.expireAt()).toNumber()
                 });
-            }
+            });
+            // }
 
             return {
                 ...offer,
@@ -188,8 +188,6 @@ export function OfferList({ connection }) {
 function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
     const myRef = useRef(null)
 
-    const scrollToMe = () => myRef.current.scrollIntoView()
-
     async function acceptOffer() {
         let password = encodeBytes(await getRandomValue(20));
         password = prompt(`Password for this offer!\nSave it (Ctrl + C)!\nYou will have to use it later!`, password);
@@ -199,9 +197,7 @@ function Offer({ offer, seller, buyer, updateOffer, setTab, address }) {
 
         await buyer.acceptOffer(offer.id, password, { url: Constants.MATCHER_URL })
             .then(async () => {
-                await updateOffer(offer.id);
                 toast.success(`Offer accepted!`);
-                scrollToMe();
             })
             .catch(e => toast.error(e.message))
 
